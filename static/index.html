@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Graph</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/networkgraph.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+
+<h1>Network Graph Visualization</h1>
+<div id="full-content">
+    <div id="sub-content">
+        <form id="csv-upload-form">
+            <input type="file" id="csvFile" accept=".csv" required>
+            <button id="upload-csv-btn" type="button">Upload CSV</button>
+        </form>
+
+        <button id="fetch-data-btn">Fetch CSV Files</button>
+    </div>
+
+    <div id="grapharea">
+        <h3 id="filetitle" style="display: none;">Select one CSV File to generate Graph</h3>
+        <div id="file-list"></div>
+        <button id="generate-graph-btn" style="display: none;">Generate Network Graph</button>
+    </div>
+</div>
+<br>
+<div id="network-graph-container" style="min-height: 400px; margin-bottom: 5vh; max-width: max-content;"></div>
+
+<script>
+    document.getElementById('upload-csv-btn').addEventListener('click', async function (e) {
+        const csvFile = document.getElementById('csvFile').files[0];
+        if (!csvFile) {
+            alert("Please select a CSV file to upload.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', csvFile);
+        const response = await fetch('http://localhost:8000/upload-csv/', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        alert(result.message);
+    });
+
+    document.getElementById('fetch-data-btn').addEventListener('click', async function () {
+        const filetitle = document.getElementById("filetitle");
+
+        const response = await fetch('http://localhost:8000/files/');
+        const data = await response.json();
+        if (data.files.length == 0) {
+            let text = `<h2>No Data present in the database, Please Upload at least one CSV</h2>`;
+            document.getElementById('file-list').innerHTML = text;
+        } else {
+            filetitle.style.display = "block";
+            let fileListHTML = '<h4>';
+            data.files.forEach((file, index) => {
+                fileListHTML += `
+                    <label>
+                        <input type="checkbox" value="${file.id}" class="file-checkbox" id="csvFile${index}">
+                        CSV File ${file.id}
+                    </label><br>
+                `;
+            });
+
+            fileListHTML += '</h4>';
+
+            document.getElementById('file-list').innerHTML = fileListHTML;
+            document.getElementById('generate-graph-btn').style.display = 'block';
+        }
+    });
+
+    document.getElementById('generate-graph-btn').addEventListener('click', async function () {
+        const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+        const selectedFiles = Array.from(checkboxes).map(checkbox => checkbox.value);
+
+        if (selectedFiles.length === 0) {
+            alert('Please select at least one file.');
+            return;
+        }
+
+        let combinedData = [];
+        for (const fileId of selectedFiles) {
+            const response = await fetch(`http://localhost:8000/csv-data/${fileId}`);
+            const data = await response.json();
+
+            combinedData = combinedData.concat(data.map(row => [row.source, row.target, row.force]));
+        }
+
+        Highcharts.chart('network-graph-container', {
+            chart: {
+                type: 'networkgraph',
+                height: '100%'
+            },
+            title: {
+                text: `Network Graph for Selected File`
+            },
+            plotOptions: {
+                networkgraph: {
+                    keys: ['from', 'to'],
+                    layoutAlgorithm: {
+                        enableSimulation: true,
+                        linkLength: 50
+                    },
+                    marker: {
+                        fill: 'black',
+                        radius: 15
+                    }
+                }
+            },
+            series: [{
+                dataLabels: {
+                    enabled: true,
+                    linkFormat: ''
+                },
+                marker: {
+                    radius: 20
+                },
+                data: combinedData
+            }]
+        });
+    });
+</script>
+
+</body>
+</html>
