@@ -9,8 +9,11 @@
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script src="https://code.highcharts.com/modules/accessibility.js"></script>
     <script src="https://code.highcharts.com/modules/data.js"></script>
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="static\styles.css">
 </head>
+
+
+
 <body>
 
 <h1>Network Graph Visualization</h1>
@@ -32,6 +35,14 @@
 </div>
 <br>
 <div id="network-graph-container" style="min-height: 400px; margin-bottom: 5vh; max-width: max-content;"></div>
+
+<svg style="position: absolute; height: 0; width: 0;">
+    <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" fill="blue" />
+        </marker>
+    </defs>
+</svg>
 
 <script>
     document.getElementById('upload-csv-btn').addEventListener('click', async function (e) {
@@ -82,6 +93,8 @@
     document.getElementById('generate-graph-btn').addEventListener('click', async function () {
         const checkboxes = document.querySelectorAll('.file-checkbox:checked');
         const selectedFiles = Array.from(checkboxes).map(checkbox => checkbox.value);
+        // const selectedFile = document.querySelector('.file-checkbox:checked');
+
 
         if (selectedFiles.length === 0) {
             alert('Please select at least one file.');
@@ -111,6 +124,11 @@
                         enableSimulation: true,
                         linkLength: 50
                     },
+                    link: {
+                        color: 'blue',
+                        lineWidth: 2,
+                        markerEnd: 'url(#arrow)' // Use the arrow marker
+                    },
                     marker: {
                         fill: 'black',
                         radius: 15
@@ -129,6 +147,71 @@
             }]
         });
     });
+
+    // Wrapping Highcharts function to draw arrow path correctly
+    (function (H) {
+        H.wrap(H.seriesTypes.networkgraph.prototype.pointClass.prototype, 'getLinkPath', function (p) {
+            var left = this.toNode,
+                right = this.fromNode;
+
+            var angle = Math.atan((left.plotX - right.plotX) /
+                (left.plotY - right.plotY));
+
+            if (angle) {
+                let path = ['M', left.plotX, left.plotY, right.plotX, right.plotY],
+                    lastPoint = left,
+                    nextLastPoint = right,
+                    pointRadius = 45,
+                    arrowLength = 20,
+                    arrowWidth = 10;
+
+                if (left.plotY < right.plotY) {
+                    path.push(
+                        nextLastPoint.plotX - pointRadius * Math.sin(angle),
+                        nextLastPoint.plotY - pointRadius * Math.cos(angle)
+                    );
+                    path.push(
+                        nextLastPoint.plotX - pointRadius * Math.sin(angle) - arrowLength * Math.sin(angle) - arrowWidth * Math.cos(angle),
+                        nextLastPoint.plotY - pointRadius * Math.cos(angle) - arrowLength * Math.cos(angle) + arrowWidth * Math.sin(angle)
+                    );
+
+                    path.push(
+                        nextLastPoint.plotX - pointRadius * Math.sin(angle),
+                        nextLastPoint.plotY - pointRadius * Math.cos(angle)
+                    );
+                    path.push(
+                        nextLastPoint.plotX - pointRadius * Math.sin(angle) - arrowLength * Math.sin(angle) + arrowWidth * Math.cos(angle),
+                        nextLastPoint.plotY - pointRadius * Math.cos(angle) - arrowLength * Math.cos(angle) - arrowWidth * Math.sin(angle)
+                    );
+
+                } else {
+                    path.push(
+                        nextLastPoint.plotX + pointRadius * Math.sin(angle),
+                        nextLastPoint.plotY + pointRadius * Math.cos(angle)
+                    );
+                    path.push(
+                        nextLastPoint.plotX + pointRadius * Math.sin(angle) + arrowLength * Math.sin(angle) - arrowWidth * Math.cos(angle),
+                        nextLastPoint.plotY + pointRadius * Math.cos(angle) + arrowLength * Math.cos(angle) + arrowWidth * Math.sin(angle)
+                    );
+                    path.push(
+                        nextLastPoint.plotX + pointRadius * Math.sin(angle),
+                        nextLastPoint.plotY + pointRadius * Math.cos(angle)
+                    );
+                    path.push(
+                        nextLastPoint.plotX + pointRadius * Math.sin(angle) + arrowLength * Math.sin(angle) + arrowWidth * Math.cos(angle),
+                        nextLastPoint.plotY + pointRadius * Math.cos(angle) + arrowLength * Math.cos(angle) - arrowWidth * Math.sin(angle)
+                    );
+                }
+
+                return path;
+            }
+
+            return [
+                ['M', left.plotX || 0, left.plotY || 0],
+                ['L', right.plotX || 0, right.plotY || 0],
+            ];
+        });
+    }(Highcharts));
 </script>
 
 </body>
